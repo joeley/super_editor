@@ -368,6 +368,18 @@ class TextDeltasDocumentEditor {
       return false;
     }
 
+    final requestedOffset = (insertionPosition.nodePosition as TextNodePosition).offset;
+    final maxOffset = insertionNode.text.length;
+    final clampedOffset = requestedOffset.clamp(0, maxOffset).toInt();
+    if (clampedOffset != requestedOffset) {
+      editorOpsLog.warning(
+          "Attempted to insert text using out-of-range offset ($requestedOffset) for node '${insertionNode.id}' with length $maxOffset. Clamped to $clampedOffset.");
+      insertionPosition = DocumentPosition(
+        nodeId: insertionPosition.nodeId,
+        nodePosition: (insertionPosition.nodePosition as TextNodePosition).copyWith(offset: clampedOffset),
+      );
+    }
+
     editorOpsLog.fine("Executing text insertion command.");
     editorOpsLog.finer("Text before insertion: '${insertionNode.text.toPlainText()}'");
     editor.execute([

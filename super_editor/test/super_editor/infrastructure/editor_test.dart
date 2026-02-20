@@ -555,6 +555,42 @@ void main() {
         );
       });
 
+      test('clamps insertion offset when InsertTextRequest is out of bounds', () {
+        final editorPieces = _createStandardEditor(
+          initialSelection: const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: "1",
+              nodePosition: TextNodePosition(offset: 0),
+            ),
+          ),
+        );
+
+        expect(
+          () => editorPieces.editor.execute([
+            InsertTextRequest(
+              documentPosition: const DocumentPosition(
+                nodeId: "1",
+                nodePosition: TextNodePosition(offset: 3),
+              ),
+              textToInsert: "A",
+              attributions: const {},
+            ),
+          ]),
+          returnsNormally,
+        );
+
+        expect((editorPieces.document.getNodeAt(0) as TextNode).text.toPlainText(), "A");
+        expect(
+          editorPieces.composer.selection,
+          const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: "1",
+              nodePosition: TextNodePosition(offset: 1),
+            ),
+          ),
+        );
+      });
+
       test('inserts new paragraph node at caret', () {
         final editorPieces = _createStandardEditor(
           initialSelection: const DocumentSelection.collapsed(

@@ -2158,7 +2158,15 @@ class InsertTextCommand extends EditCommand {
     }
 
     final textPosition = documentPosition.nodePosition as TextPosition;
-    final textOffset = textPosition.offset;
+    final requestedOffset = textPosition.offset;
+    final maxTextOffset = textNode.text.length;
+    final textOffset = requestedOffset.clamp(0, maxTextOffset).toInt();
+    if (textOffset != requestedOffset) {
+      editorDocLog.warning(
+        "Received out-of-range insertion offset ($requestedOffset) for node '${textNode.id}' with length $maxTextOffset. "
+        'Clamped to $textOffset.',
+      );
+    }
 
     textNode = textNode.copyTextNodeWith(
       text: textNode.text.insertString(
