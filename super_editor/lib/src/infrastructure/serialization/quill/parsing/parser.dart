@@ -374,6 +374,12 @@ extension OperationParser on Operation {
     var text = data as String;
     var currentNodeId = composer.selection!.extent.nodeId;
     var currentTextPosition = composer.selection!.extent.nodePosition as TextNodePosition;
+    // 中文注释：是否继承代码块要看“本次操作后实际生效的块类型”，不能只看原始属性名。
+    final effectiveBlockType = _resolveCurrentParagraphBlockTypeAfterPendingChanges(
+      editor: editor,
+      paragraphNodeId: currentNodeId,
+      pendingChanges: changeRequests,
+    );
 
     // The included inline attributes apply to all text within this insert operation.
     final inlineAttributions = <Attribution>{};
@@ -386,9 +392,11 @@ extension OperationParser on Operation {
 
     // Break the insertion text at every newline so we can insert paragraphs.
     final textPerLine = text.split("\n");
+    final shouldPropagateCodeBlock = effectiveBlockType == codeAttribution && textPerLine.length > 2;
     for (int i = 0; i < textPerLine.length; i += 1) {
       final line = textPerLine[i];
       final newNodeId = Editor.createNodeId();
+      final shouldSetCodeBlockForNextLine = shouldPropagateCodeBlock && i < textPerLine.length - 2;
 
       changeRequests.addAll([
         // Insert a line of text.
@@ -408,6 +416,8 @@ extension OperationParser on Operation {
             newNode: ParagraphNode(
               id: newNodeId,
               text: AttributedText(""),
+              // 中文注释：代码块多换行时，中间新行继续保留代码块属性，避免被解析为普通段落。
+              metadata: shouldSetCodeBlockForNextLine ? {NodeMetadata.blockType: codeAttribution} : null,
             ),
           ),
           ChangeSelectionRequest(
@@ -432,6 +442,35 @@ extension OperationParser on Operation {
 
     // Execute the block changes and inline text insertions.
     editor.execute(changeRequests);
+  }
+
+  Attribution? _resolveCurrentParagraphBlockTypeAfterPendingChanges({
+    required Editor editor,
+    required String paragraphNodeId,
+    required List<EditRequest> pendingChanges,
+  }) {
+    final document = editor.context.find<MutableDocument>(Editor.documentKey);
+    final currentNode = document.getNodeById(paragraphNodeId);
+    if (currentNode is! ParagraphNode) {
+      return null;
+    }
+
+    var blockType = currentNode.getMetadataValue(NodeMetadata.blockType) as Attribution?;
+    for (final change in pendingChanges) {
+      if (change is ChangeParagraphBlockTypeRequest &&
+          change.nodeId == paragraphNodeId) {
+        blockType = change.blockType;
+      }
+      if (change is ReplaceNodeRequest && change.existingNodeId == paragraphNodeId) {
+        final replacementNode = change.newNode;
+        if (replacementNode is! ParagraphNode) {
+          return null;
+        }
+        blockType = replacementNode.getMetadataValue(NodeMetadata.blockType) as Attribution?;
+      }
+    }
+
+    return blockType;
   }
 
   void _doInsertMedia(

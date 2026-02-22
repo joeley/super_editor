@@ -177,6 +177,64 @@ void main() {
           expect((document.getNodeAt(2)! as ParagraphNode).getMetadataValue("blockType"), codeAttribution);
           expect(document.nodeCount, 4);
         });
+
+        test("keeps a single code block when code newlines are compressed into one insert", () {
+          final document = parseQuillDeltaDocument(
+            {
+              "ops": [
+                {"insert": "a"},
+                {
+                  "attributes": {"code-block": "plain"},
+                  "insert": "\n"
+                },
+                {"insert": "b"},
+                {
+                  "attributes": {"code-block": "plain"},
+                  "insert": "\n"
+                },
+                {"insert": "c"},
+                {
+                  "attributes": {"code-block": "plain"},
+                  "insert": "\n\n\n"
+                },
+                {"insert": "\n\n\n\n"},
+              ],
+            },
+          );
+
+          final codeNodes = document.whereType<ParagraphNode>().where((node) => node.getMetadataValue("blockType") == codeAttribution).toList();
+          expect(codeNodes.length, 1);
+          expect(codeNodes.first.text.toPlainText(), startsWith("a\nb\nc"));
+        });
+
+        test("does not force code block when code format is not configured", () {
+          final document = parseQuillDeltaDocument(
+            {
+              "ops": [
+                {"insert": "a"},
+                {
+                  "attributes": {"code-block": "plain"},
+                  "insert": "\n\n\n"
+                },
+                {"insert": "b\n"},
+              ],
+            },
+            blockFormats: const [
+              HeaderDeltaFormat(),
+              BlockquoteDeltaFormat(),
+              ListDeltaFormat(),
+              AlignDeltaFormat(),
+              IndentParagraphDeltaFormat(),
+            ],
+          );
+
+          final codeNodes = document.whereType<ParagraphNode>().where((node) => node.getMetadataValue("blockType") == codeAttribution).toList();
+          expect(codeNodes, isEmpty);
+          expect((document.getNodeAt(0)! as ParagraphNode).text.toPlainText(), "a");
+          expect((document.getNodeAt(1)! as ParagraphNode).text.toPlainText(), "");
+          expect((document.getNodeAt(2)! as ParagraphNode).text.toPlainText(), "");
+          expect((document.getNodeAt(3)! as ParagraphNode).text.toPlainText(), "b");
+        });
       });
     });
   });
