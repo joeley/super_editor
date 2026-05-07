@@ -922,10 +922,16 @@ Uri? tryToParseUrl(String word) {
       const EmailLinkifier(),
     ],
   );
-  final int emailCount = extractedEmails.fold(0, (value, element) => element is EmailElement ? value + 1 : value);
-  if (emailCount == 1) {
-    // Found exactly one email. Create and return a link attribution.
-    final emailElement = extractedEmails.first as EmailElement;
+  final emailElements = extractedEmails.whereType<EmailElement>().toList();
+  if (emailElements.isNotEmpty) {
+    if (extractedEmails.length != 1 || emailElements.length != 1) {
+      // Mixed email-like content should stay plain text instead of falling
+      // through to URL parsing and creating a bad link.
+      return null;
+    }
+
+    // Found exactly one email and nothing else. Create and return a link attribution.
+    final emailElement = emailElements.single;
     return Uri(
       scheme: "mailto",
       path: emailElement.emailAddress,
