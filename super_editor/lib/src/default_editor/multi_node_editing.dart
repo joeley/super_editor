@@ -804,6 +804,10 @@ class DeleteContentCommand extends EditCommand {
       );
 
       executor.logChanges(changeList);
+      if (changeList.isNotEmpty) {
+        // Only clear composing after a real deletion; collapsed ranges can produce no content changes.
+        _clearComposingRegionIfNeeded(context, executor);
+      }
 
       return;
     }
@@ -904,6 +908,7 @@ class DeleteContentCommand extends EditCommand {
     if (startNodeAfterDeletion is! TextNode || endNodeAfterDeletion is! TextNode) {
       // Neither of the end nodes are `TextNode`s, so there's nothing
       // for us to merge. We're done.
+      _clearComposingRegionIfNeeded(context, executor);
       return;
     }
 
@@ -933,6 +938,17 @@ class DeleteContentCommand extends EditCommand {
       )
     ]);
     _log.log('DeleteSelectionCommand', ' - done with selection deletion');
+    _clearComposingRegionIfNeeded(context, executor);
+  }
+
+  void _clearComposingRegionIfNeeded(EditContext context, CommandExecutor executor) {
+    if (context.composer.composingRegion.value == null) {
+      return;
+    }
+
+    // Deleting text can shrink or remove the range that the platform IME is composing.
+    // Clear it here so the next TextEditingValue sent to Flutter can't reference stale offsets.
+    executor.executeCommand(ChangeComposingRegionCommand(null));
   }
 
   List<EditEvent> _deleteSelectionWithinSingleNode({

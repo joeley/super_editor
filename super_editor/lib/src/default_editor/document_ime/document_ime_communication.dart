@@ -260,25 +260,28 @@ class DocumentImeInputClient extends TextInputConnectionDecorator with TextInput
     }
 
     _isSendingToIme = true;
-    editorImeLog.fine("[DocumentImeInputClient] - Serializing and sending document and selection to IME");
-    editorImeLog.fine("[DocumentImeInputClient] - Selection: ${textDeltasDocumentEditor.selection.value}");
-    editorImeLog.fine("[DocumentImeInputClient] - Composing region: ${textDeltasDocumentEditor.composingRegion.value}");
-    final imeSerialization = DocumentImeSerializer(
-      textDeltasDocumentEditor.document,
-      textDeltasDocumentEditor.selection.value!,
-      textDeltasDocumentEditor.composingRegion.value,
-    );
+    try {
+      editorImeLog.fine("[DocumentImeInputClient] - Serializing and sending document and selection to IME");
+      editorImeLog.fine("[DocumentImeInputClient] - Selection: ${textDeltasDocumentEditor.selection.value}");
+      editorImeLog
+          .fine("[DocumentImeInputClient] - Composing region: ${textDeltasDocumentEditor.composingRegion.value}");
+      final imeSerialization = DocumentImeSerializer(
+        textDeltasDocumentEditor.document,
+        textDeltasDocumentEditor.selection.value!,
+        textDeltasDocumentEditor.composingRegion.value,
+      );
 
-    editorImeLog
-        .fine("[DocumentImeInputClient] - Adding invisible characters?: ${imeSerialization.didPrependPlaceholder}");
-    TextEditingValue textEditingValue = imeSerialization.toTextEditingValue();
+      editorImeLog
+          .fine("[DocumentImeInputClient] - Adding invisible characters?: ${imeSerialization.didPrependPlaceholder}");
+      TextEditingValue textEditingValue = imeSerialization.toTextEditingValue();
 
-    editorImeLog.fine("[DocumentImeInputClient] - Sending IME serialization:");
-    editorImeLog.fine("[DocumentImeInputClient] - $textEditingValue");
-    setEditingState(textEditingValue);
-    editorImeLog.fine("[DocumentImeInputClient] - Done sending document to IME");
-
-    _isSendingToIme = false;
+      editorImeLog.fine("[DocumentImeInputClient] - Sending IME serialization:");
+      editorImeLog.fine("[DocumentImeInputClient] - $textEditingValue");
+      setEditingState(textEditingValue);
+      editorImeLog.fine("[DocumentImeInputClient] - Done sending document to IME");
+    } finally {
+      _isSendingToIme = false;
+    }
   }
 
   @override

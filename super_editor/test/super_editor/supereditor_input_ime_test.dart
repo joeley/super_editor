@@ -1208,6 +1208,34 @@ Paragraph two
         );
       });
 
+      test('clears composing range when it maps outside the IME text', () {
+        final textEditingValue = DocumentImeSerializer(
+          MutableDocument(nodes: [
+            ParagraphNode(id: "1", text: AttributedText("abc")),
+          ]),
+          const DocumentSelection.collapsed(
+            position: DocumentPosition(
+              nodeId: "1",
+              nodePosition: TextNodePosition(offset: 3),
+            ),
+          ),
+          const DocumentRange(
+            start: DocumentPosition(
+              nodeId: "1",
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+            end: DocumentPosition(
+              nodeId: "1",
+              nodePosition: TextNodePosition(offset: 5),
+            ),
+          ),
+        ).toTextEditingValue();
+
+        expect(textEditingValue.text, ". abc");
+        expect(textEditingValue.selection, const TextSelection.collapsed(offset: 5));
+        expect(textEditingValue.composing, TextRange.empty);
+      });
+
       testWidgetsOnArbitraryDesktop('sends selection to platform', (tester) async {
         final context = await tester //
             .createDocument()
@@ -1911,6 +1939,59 @@ Paragraph two
 
         // Ensure the paragraphs were merged.
         expect(testContext.document.nodeCount, equals(1));
+      });
+
+      testWidgetsOnWindowsAndLinux('after hardware backspace deletes text', (tester) async {
+        final document = MutableDocument(
+          nodes: [
+            ParagraphNode(id: '1', text: AttributedText('hello')),
+          ],
+        );
+
+        final testContext = await tester
+            .createDocument() //
+            .withCustomContent(document)
+            .withInputSource(TextInputSource.ime)
+            .pump();
+
+        await tester.placeCaretInParagraph('1', 5);
+
+        const composingEndPosition = DocumentPosition(
+          nodeId: '1',
+          nodePosition: TextNodePosition(offset: 5),
+        );
+        testContext.editor.execute([
+          ChangeComposingRegionRequest(
+            const DocumentRange(
+              start: composingEndPosition,
+              end: composingEndPosition,
+            ),
+          ),
+        ]);
+        await tester.pump();
+
+        int? composingBase;
+        int? composingExtent;
+        tester
+            .interceptChannel(SystemChannels.textInput.name) //
+            .interceptMethod(
+          'TextInput.setEditingState',
+          (methodCall) {
+            final params = methodCall.arguments as Map;
+            composingBase = params['composingBase'];
+            composingExtent = params['composingExtent'];
+
+            return null;
+          },
+        );
+
+        await tester.pressBackspace();
+        await tester.pump();
+
+        expect((document.first as ParagraphNode).text.toPlainText(), 'hell');
+        expect(testContext.composer.composingRegion.value, isNull);
+        expect(composingBase, -1);
+        expect(composingExtent, -1);
       });
     });
   });

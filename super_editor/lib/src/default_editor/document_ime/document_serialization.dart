@@ -377,9 +377,9 @@ class DocumentImeSerializer {
   TextEditingValue toTextEditingValue() {
     editorImeLog.fine("Creating TextEditingValue from document. Selection: $selection");
     editorImeLog.fine("Text:\n'$imeText'");
-    final imeSelection = documentToImeSelection(selection);
+    final imeSelection = _clampSelectionToImeText(documentToImeSelection(selection));
     editorImeLog.fine("Selection: $imeSelection");
-    final imeComposingRegion = documentToImeRange(composingRegion);
+    final imeComposingRegion = _documentToImeComposingRange(composingRegion);
     editorImeLog.fine("Composing region: $imeComposingRegion");
 
     return TextEditingValue(
@@ -387,6 +387,59 @@ class DocumentImeSerializer {
       selection: imeSelection,
       composing: imeComposingRegion,
     );
+  }
+
+  TextSelection _clampSelectionToImeText(TextSelection selection) {
+    if (!selection.isValid) {
+      return selection;
+    }
+
+    final baseOffset = selection.baseOffset.clamp(0, imeText.length).toInt();
+    final extentOffset = selection.extentOffset.clamp(0, imeText.length).toInt();
+    if (baseOffset == selection.baseOffset && extentOffset == selection.extentOffset) {
+      return selection;
+    }
+
+    editorImeLog.warning(
+      "Document selection mapped outside IME text bounds. "
+      "Text length: ${imeText.length}, selection: $selection. Clamped before sending to IME.",
+    );
+    return selection.copyWith(
+      baseOffset: baseOffset,
+      extentOffset: extentOffset,
+    );
+  }
+
+  TextRange _documentToImeComposingRange(DocumentRange? documentRange) {
+    TextRange imeComposingRegion;
+    try {
+      imeComposingRegion = documentToImeRange(documentRange);
+    } catch (error) {
+      editorImeLog.warning(
+        "Couldn't map the document composing region to IME text. "
+        "Clearing the composing region before sending to IME. Error: $error",
+      );
+      return TextRange.empty;
+    }
+
+    if (_isValidImeComposingRange(imeComposingRegion)) {
+      return imeComposingRegion;
+    }
+
+    editorImeLog.warning(
+      "Document composing region mapped outside IME text bounds. "
+      "Text length: ${imeText.length}, composing: $imeComposingRegion. "
+      "Clearing before sending to IME.",
+    );
+    return TextRange.empty;
+  }
+
+  bool _isValidImeComposingRange(TextRange range) {
+    if (range == TextRange.empty) {
+      return true;
+    }
+
+    return range.start >= 0 && range.start <= range.end && range.end <= imeText.length;
   }
 }
 
