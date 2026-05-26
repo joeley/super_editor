@@ -170,6 +170,8 @@ MutableDocument parseQuillDeltaOps(
     );
   }
 
+  document.setCurrentStateAsInitialState();
+
   return document;
 }
 

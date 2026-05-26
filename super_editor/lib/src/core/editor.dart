@@ -1119,7 +1119,16 @@ class MutableDocument with Iterable<DocumentNode> implements Document, Editable 
     _listeners.clear();
   }
 
-  late final List<DocumentNode> _latestNodesSnapshot;
+  /// Sets this document's current nodes as the state restored by [reset].
+  ///
+  /// Use this after building a document through non-user-editing mutations, such as
+  /// deserializing external content. This keeps undo/redo from resetting the document
+  /// to an intermediate construction state, e.g., an empty document used during import.
+  void setCurrentStateAsInitialState() {
+    _latestNodesSnapshot = List.from(_nodes);
+  }
+
+  late List<DocumentNode> _latestNodesSnapshot;
   bool _didReset = false;
 
   final List<DocumentNode> _nodes;

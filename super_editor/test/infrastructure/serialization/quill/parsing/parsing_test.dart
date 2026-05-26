@@ -10,6 +10,43 @@ import '../test_documents.dart';
 
 void main() {
   group("Delta document parsing >", () {
+    group("undo baseline >", () {
+      test("parsed document survives undo without resetting to empty", () {
+        final document = parseQuillDeltaOps([
+          {"insert": "Hello\nWorld\n"},
+        ]);
+        final initialNodeCount = document.nodeCount;
+        final worldNode = document.getNodeAt(1)! as ParagraphNode;
+
+        final composer = MutableDocumentComposer();
+        final editor = createDefaultDocumentEditor(
+          document: document,
+          composer: composer,
+          isHistoryEnabled: true,
+        );
+
+        editor.execute([
+          ChangeSelectionRequest(
+            DocumentSelection.collapsed(
+              position: DocumentPosition(
+                nodeId: worldNode.id,
+                nodePosition: TextNodePosition(offset: worldNode.text.length),
+              ),
+            ),
+            SelectionChangeType.placeCaret,
+            SelectionReason.userInteraction,
+          ),
+          InsertNewlineAtCaretRequest(),
+        ]);
+
+        editor.undo();
+
+        expect(document.nodeCount, initialNodeCount);
+        expect((document.first as ParagraphNode).text.toPlainText(), "Hello");
+        expect((document.getNodeAt(1)! as ParagraphNode).text.toPlainText(), "World");
+      });
+    });
+
     group("text >", () {
       test("plain text followed by block format", () {
         final document = parseQuillDeltaDocument(
