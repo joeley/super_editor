@@ -115,6 +115,72 @@ void main() {
         // Ensure the text field does not cause autoscroll
         expect(finalTopLeft, initialTopLeft);
       });
+
+      testWidgetsOnAndroid('auto scrolls after the ancestor viewport resizes on the following frame', (tester) async {
+        tester.view
+          ..physicalSize = screenSizeWithoutKeyboard
+          ..platformDispatcher.textScaleFactorTestValue = 1.0
+          ..devicePixelRatio = 1.0;
+        addTearDown(() => tester.platformDispatcher.clearAllTestValues());
+
+        final viewportHeight = ValueNotifier(screenSizeWithoutKeyboard.height);
+        final focusNode = FocusNode();
+        final text = AttributedText(List.filled(10, 'Tall text field').join('\n'));
+        final controller = AttributedTextEditingController(
+          text: text,
+          selection: TextSelection.collapsed(offset: text.length),
+        );
+        addTearDown(() {
+          viewportHeight.dispose();
+          focusNode.dispose();
+          controller.dispose();
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Material(
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: ValueListenableBuilder<double>(
+                  valueListenable: viewportHeight,
+                  builder: (context, height, child) => SizedBox(
+                    width: screenSizeWithoutKeyboard.width,
+                    height: height,
+                    child: ListView(
+                      children: [
+                        ...List.generate(4, (index) => const ListTile(title: Text('BEFORE'))),
+                        SuperTextField(
+                          focusNode: focusNode,
+                          textController: controller,
+                          lineHeight: 24,
+                          maxLines: null,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        focusNode.requestFocus();
+        await tester.pumpAndSettle();
+
+        // The platform reports the keyboard before the page applies its new
+        // viewport height, matching the ordering seen on Android devices.
+        tester.view.viewInsets = const FakeViewPadding(bottom: 500);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          viewportHeight.value = screenSizeWithKeyboard.height;
+        });
+
+        await tester.pump();
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        expect(_findGlobalCaretOffset(tester).dy, lessThanOrEqualTo(screenSizeWithKeyboard.height));
+      });
     });
 
     testWidgetsOnAllPlatforms('auto scroll doesn\'t crash when text is empty', (tester) async {

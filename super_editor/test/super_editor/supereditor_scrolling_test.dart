@@ -984,6 +984,57 @@ void main() {
         expect(caretOffset.dy, greaterThanOrEqualTo(screenSizeWithKeyboard.height - trailingBoundary));
       });
 
+      testWidgetsOnAndroid('on Android, keeps caret visible when the viewport resizes on the following frame',
+          (WidgetTester tester) async {
+        tester.view
+          ..physicalSize = screenSizeWithoutKeyboard
+          ..platformDispatcher.textScaleFactorTestValue = 1.0
+          ..devicePixelRatio = 1.0;
+
+        var viewportHeight = screenSizeWithoutKeyboard.height;
+        late StateSetter setViewportState;
+        await tester.pumpWidget(
+          StatefulBuilder(
+            builder: (context, setState) {
+              setViewportState = setState;
+              return Align(
+                alignment: Alignment.topLeft,
+                child: SizedBox(
+                  height: viewportHeight,
+                  child: const _SliverTestEditor(
+                    gestureMode: DocumentGestureMode.android,
+                  ),
+                ),
+              );
+            },
+          ),
+        );
+
+        final tapPosition = Offset(screenSizeWithoutKeyboard.width / 2, screenSizeWithoutKeyboard.height - 1);
+        await tester.tapAt(tapPosition);
+        await tester.pump();
+
+        final caretFinder = find.byKey(DocumentKeys.caret);
+        expect(caretFinder, findsOneWidget);
+
+        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setViewportState(() {
+            viewportHeight = screenSizeWithKeyboard.height;
+          });
+        });
+
+        await tester.pump();
+        await tester.pump();
+        await tester.pumpAndSettle();
+
+        const trailingBoundary = 54.0;
+        expect(
+          tester.getBottomLeft(caretFinder).dy,
+          lessThanOrEqualTo(screenSizeWithKeyboard.height - trailingBoundary),
+        );
+      });
+
       testWidgetsOnIos('on iOS, keeps caret visible when keyboard appears', (WidgetTester tester) async {
         tester.view
           ..physicalSize = screenSizeWithoutKeyboard
@@ -1550,6 +1601,7 @@ class _SliverTestEditorState extends State<_SliverTestEditor> {
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
+        resizeToAvoidBottomInset: false,
         body: Padding(
           padding: const EdgeInsets.only(top: 300),
           child: CustomScrollView(

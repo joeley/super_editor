@@ -579,10 +579,14 @@ class _AndroidDocumentTouchInteractorState extends State<AndroidDocumentTouchInt
     // appearance/disappearance. Reflow the layout. Use a post-frame callback
     // to give the rest of the UI a chance to reflow, first.
     onNextFrame((_) {
-      _ensureSelectionExtentIsVisible();
-
       setState(() {
         // reflow document layout
+      });
+
+      // Ancestor viewports can apply keyboard insets during this rebuild.
+      // Reveal the selection only after that layout has completed.
+      onNextFrame((_) {
+        _ensureSelectionExtentIsVisible();
       });
     });
   }

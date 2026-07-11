@@ -371,7 +371,15 @@ class SuperAndroidTextFieldState extends State<SuperAndroidTextField>
         return;
       }
 
-      _autoScrollToKeepTextFieldVisible();
+      // Ancestor viewports can apply keyboard insets one frame after the
+      // metrics notification. Wait for that layout before revealing the caret.
+      onNextFrame((_) {
+        if (!_focusNode.hasFocus) {
+          return;
+        }
+
+        _autoScrollToKeepTextFieldVisible();
+      });
     });
   }
 
