@@ -867,6 +867,8 @@ class DefaultAndroidSuperMessageToolbar extends StatelessWidget {
       documentSelection: editor.composer.selection!,
     );
     _saveToClipboard(textToCopy);
+
+    messageControlsController.hideToolbar();
   }
 
   void _selectAll() {

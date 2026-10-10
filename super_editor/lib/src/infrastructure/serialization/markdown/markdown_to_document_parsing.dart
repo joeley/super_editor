@@ -108,7 +108,9 @@ MutableDocument deserializeMarkdownToDocument(
   final hangingEmptyLines = markdownLines.reversed.takeWhile((line) => _blankLinePattern.hasMatch(line.content));
   if (hangingEmptyLines.isNotEmpty && documentNodes.lastOrNull is ListItemNode) {
     for (var i = 0; i < hangingEmptyLines.length ~/ 2; i++) {
-      documentNodes.add(ParagraphNode(id: Editor.createNodeId(), text: AttributedText()));
+      documentNodes.add(
+        ParagraphNode(id: Editor.createNodeId(), text: AttributedText()),
+      );
     }
   }
 
@@ -209,9 +211,23 @@ class _MarkdownToDocument implements md.NodeVisitor {
         _addHeader(element, level: 6);
         break;
       case 'p':
-        final blockImage = _maybeParseBlockImage(element.textContent);
-        if (blockImage != null) {
-          _addImage(blockImage);
+        final mixedContent = syntax == MarkdownSyntax.superEditor
+            ? _parseMixedParagraphContent(element.textContent)
+            : null;
+        if (mixedContent != null) {
+          for (final segment in mixedContent) {
+            if (segment.image != null) {
+              _addImage(segment.image!);
+            } else {
+              final attributedText = parseInlineMarkdown(
+                segment.text!,
+                inlineMarkdownSyntaxes: inlineMarkdownSyntaxes,
+                inlineHtmlSyntaxes: inlineHtmlSyntaxes,
+                encodeHtml: encodeHtml,
+              );
+              _addParagraph(attributedText, element.attributes);
+            }
+          }
         } else {
           final attributedText = parseInlineMarkdown(
             element.textContent,
@@ -328,28 +344,27 @@ class _MarkdownToDocument implements md.NodeVisitor {
         break;
     }
 
-    final textAlign = element.attributes['textAlign'];
     _content.add(
       ParagraphNode(
         id: Editor.createNodeId(),
         text: _parseInlineText(element.textContent),
         metadata: {
           'blockType': headerAttribution,
-          'textAlign': textAlign,
+          if (element.attributes['textAlign'] != null) //
+            'textAlign': element.attributes['textAlign'],
         },
       ),
     );
   }
 
   void _addParagraph(AttributedText attributedText, Map<String, String> attributes) {
-    final textAlign = attributes['textAlign'];
-
     _content.add(
       ParagraphNode(
         id: Editor.createNodeId(),
         text: attributedText,
         metadata: {
-          'textAlign': textAlign,
+          if (attributes['textAlign'] != null) //
+            'textAlign': attributes['textAlign'],
         },
       ),
     );
@@ -479,6 +494,51 @@ class _MarkdownToDocument implements md.NodeVisitor {
       markdown,
       syntax: syntax,
     );
+  }
+
+  /// Splits [markdown] (a multi-line paragraph) into an ordered list of
+  /// paragraph-text segments and block images.
+  ///
+  /// Returns `null` if the content contains no block images, in which case the
+  /// caller should treat the whole text as a single paragraph.
+  ///
+  /// When images are present, consecutive non-image lines are grouped into a
+  /// single paragraph segment. For example:
+  ///
+  /// ```
+  /// A caption:
+  /// ![Image 1](url1)
+  /// B caption:
+  /// ![Image 2](url2)
+  /// ```
+  ///
+  /// produces: paragraph("A caption:"), image(url1), paragraph("B caption:"), image(url2).
+  List<_ParagraphOrImage>? _parseMixedParagraphContent(String markdown) {
+    final lines = markdown.split('\n');
+    final segments = <_ParagraphOrImage>[];
+    final textBuffer = StringBuffer();
+    bool foundImage = false;
+
+    for (final line in lines) {
+      final image = _maybeParseBlockImage(line);
+      if (image != null) {
+        foundImage = true;
+        if (textBuffer.isNotEmpty) {
+          segments.add(_ParagraphOrImage.paragraph(textBuffer.toString()));
+          textBuffer.clear();
+        }
+        segments.add(_ParagraphOrImage.image(image));
+      } else {
+        if (textBuffer.isNotEmpty) textBuffer.write('\n');
+        textBuffer.write(line);
+      }
+    }
+
+    if (textBuffer.isNotEmpty) {
+      segments.add(_ParagraphOrImage.paragraph(textBuffer.toString()));
+    }
+
+    return foundImage ? segments : null;
   }
 }
 
@@ -840,6 +900,15 @@ class _HeaderWithAlignmentSyntax extends md.BlockSyntax {
         return 'left';
     }
   }
+}
+
+/// A segment of a mixed paragraph: either a run of plain text or a block image.
+class _ParagraphOrImage {
+  _ParagraphOrImage.paragraph(String this.text) : image = null;
+  _ParagraphOrImage.image(_MarkdownImage this.image) : text = null;
+
+  final String? text;
+  final _MarkdownImage? image;
 }
 
 class _MarkdownImage {

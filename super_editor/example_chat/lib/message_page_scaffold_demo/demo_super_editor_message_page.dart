@@ -366,6 +366,8 @@ class _ChatEditorState extends State<_ChatEditor> {
   final _editorKey = GlobalKey();
   final _editorFocusNode = FocusNode();
 
+  final _previewModePlugin = ChatPreviewModePlugin();
+
   late final KeyboardPanelController<_Panel> _keyboardPanelController;
   late final SoftwareKeyboardController _softwareKeyboardController;
   final _isImeConnected = ValueNotifier(false);
@@ -447,7 +449,7 @@ class _ChatEditorState extends State<_ChatEditor> {
       isImeConnected: _isImeConnected,
       contentBuilder: (BuildContext context, _Panel? openPanel) {
         return Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             ListenableBuilder(
               listenable: _editorFocusNode,
@@ -549,6 +551,9 @@ class _ChatEditorState extends State<_ChatEditor> {
             const HintComponentBuilder("Send a message...", _hintTextStyleBuilder),
             ...defaultComponentBuilders,
           ],
+          plugins: {
+            _previewModePlugin,
+          },
         ),
       ),
     );

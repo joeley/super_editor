@@ -42,6 +42,26 @@ class ParagraphNode extends TextNode {
   /// The indent level of this paragraph - `0` is no indent.
   final int indent;
 
+  bool canSplitAt(NodePosition position) {
+    return position is TextNodePosition && position.offset > 0 && position.offset <= text.length;
+  }
+
+  (DocumentNode firstPart, DocumentNode secondPart) splitAt(nodePosition, {required String newId}) {
+    if (!canSplitAt(nodePosition)) {
+      throw Exception("Can't split paragraph ($id) at $nodePosition");
+    }
+
+    return (
+      copyParagraphWith(
+        text: text.copyText(0, nodePosition.offset),
+      ),
+      copyParagraphWith(
+        id: newId,
+        text: text.copyText(nodePosition.offset),
+      ),
+    );
+  }
+
   ParagraphNode copyParagraphWith({
     String? id,
     AttributedText? text,
@@ -182,6 +202,8 @@ class ParagraphComponentViewModel extends SingleColumnLayoutComponentViewModel w
     this.textDirection = TextDirection.ltr,
     this.textAlignment = TextAlign.left,
     this.textScaler,
+    this.maxLines,
+    this.overflow = TextOverflow.clip,
     this.selection,
     required this.selectionColor,
     this.highlightWhenEmpty = false,
@@ -220,6 +242,10 @@ class ParagraphComponentViewModel extends SingleColumnLayoutComponentViewModel w
   TextDirection textDirection;
   @override
   TextAlign textAlignment;
+  @override
+  int? maxLines;
+  @override
+  TextOverflow overflow;
 
   /// The text scaling policy.
   ///
@@ -239,6 +265,7 @@ class ParagraphComponentViewModel extends SingleColumnLayoutComponentViewModel w
       ParagraphComponentViewModel(
         nodeId: nodeId,
         createdAt: createdAt,
+        // FIXME: Do we need to send in the `text`? Isn't the superclass already doing it?
         text: text.copy(),
         textStyleBuilder: textStyleBuilder,
         opacity: opacity,
@@ -333,8 +360,12 @@ class HintComponentBuilder extends ParagraphComponentBuilder {
       text: componentViewModel.text,
       inlineWidgetBuilders: componentViewModel.inlineWidgetBuilders,
       textStyleBuilder: componentViewModel.textStyleBuilder,
+      maxLines: componentViewModel.maxLines,
+      overflow: componentViewModel.overflow,
       hintText: AttributedText(componentViewModel.hintText),
       hintStyleBuilder: (attributions) => hintStyleBuilder(componentContext.context),
+      hintMaxLines: componentViewModel.maxLines,
+      hintOverflow: componentViewModel.overflow,
       textSelection: componentViewModel.selection,
       selectionColor: componentViewModel.selectionColor,
       underlines: componentViewModel.createUnderlines(),
@@ -363,6 +394,8 @@ class HintComponentViewModel extends SingleColumnLayoutComponentViewModel with T
       inlineWidgetBuilders: viewModel.inlineWidgetBuilders,
       textAlignment: viewModel.textAlignment,
       textDirection: viewModel.textDirection,
+      maxLines: viewModel.maxLines,
+      overflow: viewModel.overflow,
       textStyleBuilder: viewModel.textStyleBuilder,
       selectionColor: viewModel.selectionColor,
       indent: viewModel.indent,
@@ -383,6 +416,8 @@ class HintComponentViewModel extends SingleColumnLayoutComponentViewModel with T
     this.inlineWidgetBuilders = const [],
     this.textAlignment = TextAlign.left,
     this.textDirection = TextDirection.ltr,
+    this.maxLines,
+    this.overflow = TextOverflow.clip,
     required this.textStyleBuilder,
     required this.selectionColor,
     this.indent = 0,
@@ -404,6 +439,10 @@ class HintComponentViewModel extends SingleColumnLayoutComponentViewModel with T
   TextDirection textDirection;
   @override
   TextAlign textAlignment;
+  @override
+  int? maxLines;
+  @override
+  TextOverflow overflow;
   int indent;
   @override
   TextSelection? selection;
@@ -511,6 +550,8 @@ class _ParagraphComponentState extends State<ParagraphComponent>
               textDirection: widget.viewModel.textDirection,
               textAlign: widget.viewModel.textAlignment,
               textScaler: widget.viewModel.textScaler,
+              maxLines: widget.viewModel.maxLines,
+              overflow: widget.viewModel.overflow,
               textStyleBuilder: widget.viewModel.textStyleBuilder,
               inlineWidgetBuilders: widget.viewModel.inlineWidgetBuilders,
               metadata: widget.viewModel.blockType != null

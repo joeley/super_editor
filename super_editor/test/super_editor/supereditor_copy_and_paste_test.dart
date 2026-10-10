@@ -10,6 +10,14 @@ import '../test_runners.dart';
 
 void main() {
   group('SuperEditor copy and paste > ', () {
+    test('keeps mixed email text as plain text', () {
+      expect(tryToParseUrl('Contact:somebody@gmail.com'), isNull);
+    });
+
+    test('recognizes a standalone email as a mailto link', () {
+      expect(tryToParseUrl('somebody@gmail.com'), Uri.parse('mailto:somebody@gmail.com'));
+    });
+
     testWidgetsOnApple('pastes within a paragraph', (tester) async {
       await tester //
           .createDocument()

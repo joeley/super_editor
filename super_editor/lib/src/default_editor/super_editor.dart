@@ -142,6 +142,7 @@ class SuperEditor extends StatefulWidget {
     this.plugins = const {},
     this.debugPaint = const DebugPaintConfig(),
     this.shrinkWrap = false,
+    this.log = const SuperEditorPrintLog(),
   })  : stylesheet = stylesheet ?? defaultStylesheet,
         selectionStyles = selectionStyle ?? defaultSelectionStyle,
         componentBuilders = [
@@ -294,7 +295,7 @@ class SuperEditor extends StatefulWidget {
   /// The `SuperEditor` gesture mode, e.g., mouse or touch.
   final DocumentGestureMode? gestureMode;
 
-  /// List of factories that creates a [ContentTapDelegate], which is given an
+  /// List of factories that create a [ContentTapDelegate], which is given an
   /// opportunity to respond to taps on content before the editor, itself.
   ///
   /// A [ContentTapDelegate] might be used, for example, to launch a URL
@@ -382,6 +383,14 @@ class SuperEditor extends StatefulWidget {
   /// Whether the scroll view used by the editor should shrink-wrap its contents.
   /// Only used when editor is not inside an scrollable.
   final bool shrinkWrap;
+
+  /// A log that reports specific errors and exceptional events that occur while
+  /// running a [SuperEditor].
+  ///
+  /// This log was introduced to create a place to report errors to apps that those
+  /// apps might want to send to their own issue tracker to gain visibility into why
+  /// issues are happening in their editor.
+  final SuperEditorPrintLog? log;
 
   @override
   SuperEditorState createState() => SuperEditorState();
@@ -489,6 +498,7 @@ class SuperEditorState extends State<SuperEditor> {
 
     if (widget.focusNode != oldWidget.focusNode) {
       _focusNode = (widget.focusNode ?? FocusNode())..addListener(_onFocusChange);
+      _onFocusChange();
     }
 
     if (widget.documentLayoutKey != oldWidget.documentLayoutKey) {
@@ -527,6 +537,19 @@ class SuperEditorState extends State<SuperEditor> {
       _createEditContext();
       _createLayoutPresenter();
     } else {
+      // The editor didn't change, but the plugin set may have. Detach any
+      // plugins that were removed, and attach any plugins that were added.
+      for (final oldPlugin in oldWidget.plugins) {
+        if (!widget.plugins.contains(oldPlugin)) {
+          oldPlugin._detachFromSuperEditor(widget.editor);
+        }
+      }
+      for (final newPlugin in widget.plugins) {
+        if (!oldWidget.plugins.contains(newPlugin)) {
+          newPlugin._attachToSuperEditor(widget.editor);
+        }
+      }
+
       if (widget.selectionStyles != oldWidget.selectionStyles) {
         _docLayoutSelectionStyler.selectionStyles = widget.selectionStyles;
       }
@@ -599,6 +622,9 @@ class SuperEditorState extends State<SuperEditor> {
 
     for (final plugin in widget.plugins) {
       plugin._attachToSuperEditor(widget.editor);
+
+      // Notify plugin of focus state at time of attachment.
+      plugin.onFocusChange(_focusNode);
     }
 
     // The ContentTapDelegate depends upon the EditContext. Recreate the
@@ -662,6 +688,11 @@ class SuperEditorState extends State<SuperEditor> {
   void _onFocusChange() {
     _recomputeIfLayoutShouldShowCaret();
     _primaryFocusListener.value = _focusNode.hasPrimaryFocus;
+
+    // Notify plugins about focus change.
+    for (final plugin in widget.plugins) {
+      plugin.onFocusChange(_focusNode);
+    }
   }
 
   void _recomputeIfLayoutShouldShowCaret() {
@@ -841,6 +872,7 @@ class SuperEditorState extends State<SuperEditor> {
           ],
           selectorHandlers: widget.selectorHandlers ?? defaultEditorSelectorHandlers,
           isImeConnected: _isImeConnected,
+          log: widget.log?.imeDeltas,
           child: child,
         );
     }
@@ -900,6 +932,7 @@ class SuperEditorState extends State<SuperEditor> {
               ),
             ]);
           },
+          isImeConnected: _isImeConnected,
           scrollChangeSignal: _scrollChangeSignal,
           dragHandleAutoScroller: _dragHandleAutoScroller,
           defaultToolbarBuilder: (overlayContext, mobileToolbarKey, focalPoint) => defaultAndroidEditorToolbarBuilder(
@@ -947,6 +980,7 @@ class SuperEditorState extends State<SuperEditor> {
           document: editContext.document,
           getDocumentLayout: () => editContext.documentLayout,
           selection: editContext.composer.selectionNotifier,
+          isImeConnected: _isImeConnected,
           openKeyboardWhenTappingExistingSelection: widget.selectionPolicies.openKeyboardWhenTappingExistingSelection,
           openKeyboardOnSelectionChange: widget.imePolicies.openKeyboardOnSelectionChange,
           openSoftwareKeyboard: _openSoftwareKeyboard,
@@ -968,6 +1002,7 @@ class SuperEditorState extends State<SuperEditor> {
           document: editContext.document,
           getDocumentLayout: () => editContext.documentLayout,
           selection: editContext.composer.selectionNotifier,
+          isImeConnected: _isImeConnected,
           openKeyboardWhenTappingExistingSelection: widget.selectionPolicies.openKeyboardWhenTappingExistingSelection,
           openKeyboardOnSelectionChange: widget.imePolicies.openKeyboardOnSelectionChange,
           openSoftwareKeyboard: _openSoftwareKeyboard,
@@ -1245,6 +1280,13 @@ abstract class SuperEditorPlugin {
   /// Removes behaviors from the given [editor], which were added in [attach].
   void detach(Editor editor) {}
 
+  /// Hook, which is invoked when the attached `SuperEditor` widget gains or
+  /// loses focus.
+  ///
+  /// This hook might be called at times when no change in focus actually took place.
+  /// It's the job of implementers to handle repeat invocations without focus changes.
+  void onFocusChange(FocusNode editorFocusNode) {}
+
   /// Additional [SuperEditorKeyboardAction]s that will be added to a given [SuperEditor] widget.
   List<SuperEditorKeyboardAction> get keyboardActions => [];
 
@@ -1382,7 +1424,7 @@ class DefaultCaretOverlayBuilder implements SuperEditorLayerBuilder {
     this.platformOverride,
     this.displayOnAllPlatforms = false,
     this.displayCaretWithExpandedSelection = true,
-    this.blinkTimingMode = BlinkTimingMode.ticker,
+    this.blinkTimingMode = BlinkTimingMode.timer,
   });
 
   /// Styles applied to the caret that's painted by this caret overlay.
@@ -1825,3 +1867,16 @@ TextStyle defaultStyleBuilder(Set<Attribution> attributions) {
 const defaultSelectionStyle = SelectionStyles(
   selectionColor: Color(0xFFACCEF7),
 );
+
+/// A log that reports specific important errors and exceptional situations that
+/// happen when running a [SuperEditor].
+abstract class SuperEditorLog {
+  TextDeltasDocumentEditorLog get imeDeltas;
+}
+
+class SuperEditorPrintLog implements SuperEditorLog {
+  const SuperEditorPrintLog() : imeDeltas = const ConsolePrintTextDeltasDocumentEditorLog();
+
+  @override
+  final ConsolePrintTextDeltasDocumentEditorLog imeDeltas;
+}

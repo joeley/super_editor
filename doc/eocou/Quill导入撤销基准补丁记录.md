@@ -1,7 +1,8 @@
 # eocou fork：Quill 导入文档撤销基准补丁记录（super_editor）
 
-更新时间：2026-05-26  
-分支：eocou
+更新时间：2026-10-11
+
+分支：`eocou`、`eocou-next`
 
 ## 1. 为什么要改
 
@@ -102,14 +103,15 @@ eocou app 层可以在 decode 后重新构造一次 `MutableDocument(nodes: pars
 
 ## 6. 验收建议
 
-本补丁没有在 fork 内新增单测。eocou 侧建议用真实应用流程验证：
+fork 已在 `super_editor/test/infrastructure/serialization/quill/parsing/parsing_test.dart` 新增
+`parsed document survives undo without resetting to empty`，覆盖导入后编辑、撤销仍保留解析内容。
+该测试在 `eocou-next` 合并官方 stable 后通过。
+
+eocou 应用接入新分支后，仍需用真实应用流程验证：
 
 1. 打开一个已经保存过的笔记/任务。
 2. 输入普通文字，按撤销，确认不报错且内容恢复。
 3. 插入 eocou 自定义表格节点，按撤销，确认不报错且表格被撤销。
 4. 重复验证未保存的新笔记，确认原有内存编辑行为不变。
 
-如果后续要补测试，建议覆盖 `parseQuillDeltaOps(...)` 返回文档后：
-- `document.reset()` 保留解析内容。
-- 创建开启 history 的 editor 后，编辑并 undo 能恢复到解析内容。
-
+后续可以进一步补充直接调用 `document.reset()` 的独立用例；编辑并 undo 恢复解析内容已有回归覆盖。

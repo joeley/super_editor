@@ -2,7 +2,9 @@
 
 日期：2026-05-26
 
-分支：`eocou`
+分支：`eocou`、`eocou-next`
+
+合并核对日期：2026-10-11
 
 ## 背景
 
@@ -98,7 +100,8 @@ super_editor/lib/src/default_editor/document_ime/document_ime_communication.dart
 文件：
 
 ```text
-super_editor/test/super_editor/supereditor_input_ime_test.dart
+super_editor/test/super_editor/text_entry/ime/ime_serialization_test.dart
+super_editor/test/super_editor/text_entry/ime/ime_composing_region_test.dart
 ```
 
 新增覆盖：
@@ -108,6 +111,12 @@ super_editor/test/super_editor/supereditor_input_ime_test.dart
    - 正文正常少一个字符；
    - SuperEditor composer 的 composingRegion 被清空；
    - 发给平台 IME 的 composingBase / composingExtent 是 `-1 / -1`。
+
+以上路径适用于 `eocou-next`：官方拆分了原来的 `supereditor_input_ime_test.dart`，本地两个用例已迁入对应新文件，旧大文件按官方处理删除。旧 `eocou` 分支仍使用原文件路径。
+
+`eocou-next` 另在 `ime_content_deletion_test.dart` 覆盖：直接删除内容、删除全部选中节点、跨段落删除并合并时清 composing，以及折叠范围没有实际删除时保留 composing。
+
+合并时保留官方的新 selection 更新逻辑，并为“删除全部选中节点后插入空段落”的新返回路径补上 composing 清理。`_sendDocumentToIme()` 的 `try/finally` 已核对保留，尚未新增发送异常后的恢复测试。
 
 ## 合并冲突处理建议
 

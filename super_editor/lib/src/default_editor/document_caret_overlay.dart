@@ -21,7 +21,7 @@ class CaretDocumentOverlay extends DocumentLayoutLayerStatefulWidget {
     this.platformOverride,
     this.displayOnAllPlatforms = false,
     this.displayCaretWithExpandedSelection = true,
-    this.blinkTimingMode = BlinkTimingMode.ticker,
+    this.blinkTimingMode = BlinkTimingMode.timer,
   }) : super(key: key);
 
   /// The editor's [DocumentComposer], which reports the current selection.
@@ -81,6 +81,17 @@ class CaretDocumentOverlayState extends DocumentLayoutLayerState<CaretDocumentOv
   void didUpdateWidget(CaretDocumentOverlay oldWidget) {
     super.didUpdateWidget(oldWidget);
 
+    if (widget.blinkTimingMode != oldWidget.blinkTimingMode) {
+      _blinkController.dispose();
+
+      switch (widget.blinkTimingMode) {
+        case BlinkTimingMode.ticker:
+          _blinkController = BlinkController(tickerProvider: this);
+        case BlinkTimingMode.timer:
+          _blinkController = BlinkController.withTimer();
+      }
+    }
+
     if (widget.composer != oldWidget.composer) {
       oldWidget.composer.selectionNotifier.removeListener(_onSelectionChange);
       widget.composer.selectionNotifier.addListener(_onSelectionChange);
@@ -97,6 +108,9 @@ class CaretDocumentOverlayState extends DocumentLayoutLayerState<CaretDocumentOv
 
     super.dispose();
   }
+
+  @visibleForTesting
+  bool get isCaretTicking => _blinkController.isBlinking;
 
   @visibleForTesting
   bool get isCaretVisible => _blinkController.opacity == 1.0 && !_shouldHideCaretForExpandedSelection;
@@ -124,8 +138,17 @@ class CaretDocumentOverlayState extends DocumentLayoutLayerState<CaretDocumentOv
   }
 
   void _startOrStopBlinking() {
+    final isDesktop = switch (defaultTargetPlatform) {
+      TargetPlatform.iOS => false,
+      TargetPlatform.android => false,
+      TargetPlatform.linux => true,
+      TargetPlatform.macOS => true,
+      TargetPlatform.windows => true,
+      TargetPlatform.fuchsia => true,
+    };
+
     // TODO: allow a configurable policy as to whether to show the caret at all when the selection is expanded: https://github.com/superlistapp/super_editor/issues/234
-    final wantsToBlink = widget.composer.selection != null;
+    final wantsToBlink = widget.composer.selection != null && (widget.displayOnAllPlatforms || isDesktop);
     if (wantsToBlink && _blinkController.isBlinking) {
       return;
     }
@@ -199,18 +222,18 @@ class CaretDocumentOverlayState extends DocumentLayoutLayerState<CaretDocumentOv
       return const EmptyBox();
     }
 
-    // Use a RepaintBoundary so that caret flashing doesn't invalidate our
-    // ancestor painting.
     return IgnorePointer(
-      child: RepaintBoundary(
-        child: Stack(
-          clipBehavior: Clip.none,
-          children: [
-            if (caret != null)
-              Positioned(
-                top: caret.top,
-                left: caret.left,
-                height: caret.height,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (caret != null)
+            Positioned(
+              top: caret.top,
+              left: caret.left,
+              height: caret.height,
+              child: RepaintBoundary(
+                // Use a RepaintBoundary so that caret flashing doesn't invalidate our
+                // ancestor painting.
                 child: AnimatedBuilder(
                   animation: _blinkController,
                   builder: (context, child) {
@@ -225,8 +248,8 @@ class CaretDocumentOverlayState extends DocumentLayoutLayerState<CaretDocumentOv
                   },
                 ),
               ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

@@ -207,6 +207,8 @@ class ListItemComponentBuilder implements ComponentBuilder {
         textSelection: componentViewModel.selection,
         textDirection: componentViewModel.textDirection,
         textAlignment: componentViewModel.textAlignment,
+        maxLines: componentViewModel.maxLines,
+        overflow: componentViewModel.overflow,
         selectionColor: componentViewModel.selectionColor,
         highlightWhenEmpty: componentViewModel.highlightWhenEmpty,
         underlines: componentViewModel.createUnderlines(),
@@ -220,6 +222,8 @@ class ListItemComponentBuilder implements ComponentBuilder {
         text: componentViewModel.text,
         textDirection: componentViewModel.textDirection,
         textAlignment: componentViewModel.textAlignment,
+        maxLines: componentViewModel.maxLines,
+        overflow: componentViewModel.overflow,
         styleBuilder: componentViewModel.textStyleBuilder,
         numeralStyle: componentViewModel.numeralStyle,
         textSelection: componentViewModel.selection,
@@ -249,6 +253,8 @@ abstract class ListItemComponentViewModel extends SingleColumnLayoutComponentVie
     this.inlineWidgetBuilders = const [],
     this.textDirection = TextDirection.ltr,
     this.textAlignment = TextAlign.left,
+    this.maxLines,
+    this.overflow = TextOverflow.clip,
     this.selection,
     required this.selectionColor,
     this.highlightWhenEmpty = false,
@@ -281,6 +287,10 @@ abstract class ListItemComponentViewModel extends SingleColumnLayoutComponentVie
   TextDirection textDirection;
   @override
   TextAlign textAlignment;
+  @override
+  int? maxLines;
+  @override
+  TextOverflow overflow;
   @override
   TextSelection? selection;
   @override
@@ -324,6 +334,8 @@ class UnorderedListItemComponentViewModel extends ListItemComponentViewModel {
     this.dotStyle = const ListItemDotStyle(),
     super.textDirection = TextDirection.ltr,
     super.textAlignment = TextAlign.left,
+    super.maxLines,
+    super.overflow = TextOverflow.clip,
     super.selection,
     required super.selectionColor,
     super.highlightWhenEmpty = false,
@@ -400,6 +412,8 @@ class OrderedListItemComponentViewModel extends ListItemComponentViewModel {
     super.inlineWidgetBuilders = const [],
     super.textDirection = TextDirection.ltr,
     super.textAlignment = TextAlign.left,
+    super.maxLines,
+    super.overflow = TextOverflow.clip,
     super.selection,
     required super.selectionColor,
     super.highlightWhenEmpty = false,
@@ -426,7 +440,7 @@ class OrderedListItemComponentViewModel extends ListItemComponentViewModel {
       OrderedListItemComponentViewModel(
         nodeId: nodeId,
         createdAt: createdAt,
-        text: text,
+        text: text.copy(),
         textStyleBuilder: textStyleBuilder,
         opacity: opacity,
         selectionColor: selectionColor,
@@ -508,6 +522,8 @@ class UnorderedListItemComponent extends StatefulWidget {
     required this.text,
     this.textDirection = TextDirection.ltr,
     this.textAlignment = TextAlign.left,
+    this.maxLines,
+    this.overflow = TextOverflow.clip,
     required this.styleBuilder,
     this.inlineWidgetBuilders = const [],
     this.dotBuilder = _defaultUnorderedListItemDotBuilder,
@@ -527,6 +543,8 @@ class UnorderedListItemComponent extends StatefulWidget {
   final AttributedText text;
   final TextDirection textDirection;
   final TextAlign textAlignment;
+  final int? maxLines;
+  final TextOverflow overflow;
   final AttributionStyleBuilder styleBuilder;
   final InlineWidgetBuilderChain inlineWidgetBuilders;
   final UnorderedListItemDotBuilder dotBuilder;
@@ -596,6 +614,8 @@ class _UnorderedListItemComponentState extends State<UnorderedListItemComponent>
                 text: widget.text,
                 textDirection: widget.textDirection,
                 textAlign: widget.textAlignment,
+                maxLines: widget.maxLines,
+                overflow: widget.overflow,
                 textStyleBuilder: widget.styleBuilder,
                 inlineWidgetBuilders: widget.inlineWidgetBuilders,
                 textSelection: widget.textSelection,
@@ -683,6 +703,8 @@ class OrderedListItemComponent extends StatefulWidget {
     required this.text,
     this.textDirection = TextDirection.ltr,
     this.textAlignment = TextAlign.left,
+    this.maxLines,
+    this.overflow = TextOverflow.clip,
     required this.styleBuilder,
     this.inlineWidgetBuilders = const [],
     this.numeralBuilder = _defaultOrderedListItemNumeralBuilder,
@@ -703,6 +725,8 @@ class OrderedListItemComponent extends StatefulWidget {
   final AttributedText text;
   final TextDirection textDirection;
   final TextAlign textAlignment;
+  final int? maxLines;
+  final TextOverflow overflow;
   final AttributionStyleBuilder styleBuilder;
   final InlineWidgetBuilderChain inlineWidgetBuilders;
   final OrderedListItemNumeralBuilder numeralBuilder;
@@ -773,6 +797,8 @@ class _OrderedListItemComponentState extends State<OrderedListItemComponent> {
                 text: widget.text,
                 textDirection: widget.textDirection,
                 textAlign: widget.textAlignment,
+                maxLines: widget.maxLines,
+                overflow: widget.overflow,
                 textStyleBuilder: widget.styleBuilder,
                 inlineWidgetBuilders: widget.inlineWidgetBuilders,
                 textSelection: widget.textSelection,

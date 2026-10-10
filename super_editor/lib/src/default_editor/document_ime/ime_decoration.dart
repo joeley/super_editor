@@ -49,6 +49,9 @@ abstract class TextInputConnectionDecorator implements TextInputConnection {
           textAlign: textAlign);
 
   @override
+  void updateStyle(TextInputStyle style) => client?.updateStyle(style);
+
+  @override
   void requestAutofill() => client?.requestAutofill();
 
   @override
@@ -79,7 +82,10 @@ class DeltaTextInputClientDecorator with DeltaTextInputClient, TextInputClient {
   /// itself as the client, or not.
   bool isCurrentClient(DeltaTextInputClient client) => _client == client;
 
-  set client(DeltaTextInputClient? client) => _client = client;
+  set client(DeltaTextInputClient? client) {
+    _client = client;
+  }
+
   DeltaTextInputClient? _client;
 
   @override
